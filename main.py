@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import precision_score, classification_report, confusion_matrix, precision_recall_curve
+from sklearn.metrics import precision_score, recall_score, classification_report, confusion_matrix, precision_recall_curve
 from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_breast_cancer
@@ -20,7 +20,7 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# 4. XGBoost Classifier with GridSearchCV to maximize precision
+# 4. XGBoost with GridSearchCV (simplified grid for speed)
 param_grid = {
     'n_estimators': [100],
     'max_depth': [3],
@@ -37,30 +37,35 @@ grid_search = GridSearchCV(estimator=xgb, param_grid=param_grid,
 grid_search.fit(X_train_scaled, y_train)
 best_model = grid_search.best_estimator_
 
-# 5. Get predicted probabilities and tune threshold
+# 5. Predict probabilities and tune threshold
 y_proba = best_model.predict_proba(X_test_scaled)[:, 1]
-
-# Compute precision-recall curve
 precisions, recalls, thresholds = precision_recall_curve(y_test, y_proba)
 
-# Find the threshold that gives the highest precision
-optimal_idx = np.argmax(precisions)
-optimal_threshold = thresholds[optimal_idx]
-print(f"\n🔍 Best Threshold for Max Precision: {optimal_threshold:.3f}")
-print(f"Precision at this threshold: {precisions[optimal_idx]:.3f}")
+# 6. Find threshold with highest precision where recall ≥ 0.6
+best_threshold = 0.5  # fallback default
+best_precision = 0
+min_recall = 0.6
 
-# 6. Use custom threshold to make predictions
-y_pred_custom = (y_proba >= optimal_threshold).astype(int)
+for p, r, t in zip(precisions, recalls, thresholds):
+    if r >= min_recall and p > best_precision:
+        best_precision = p
+        best_threshold = t
 
-# 7. Evaluation
+print(f"\n🔍 Best Threshold for Precision (Recall ≥ {min_recall}): {best_threshold:.3f}")
+print(f"Precision at this threshold: {best_precision:.3f}")
+
+# 7. Predict using improved threshold
+y_pred_custom = (y_proba >= best_threshold).astype(int)
+
+# 8. Evaluation
 print("\nClassification Report:\n", classification_report(y_test, y_pred_custom))
 print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred_custom))
 
-# 8. Optional: Plot Precision-Recall Curve
+# 9. Plot Precision & Recall vs Threshold
 plt.figure(figsize=(8, 6))
-plt.plot(thresholds, precisions[:-1], label="Precision")
-plt.plot(thresholds, recalls[:-1], label="Recall")
-plt.axvline(optimal_threshold, color='red', linestyle='--', label=f'Optimal Threshold = {optimal_threshold:.2f}')
+plt.plot(thresholds, precisions[:-1], label="Precision", color='blue')
+plt.plot(thresholds, recalls[:-1], label="Recall", color='green')
+plt.axvline(best_threshold, color='red', linestyle='--', label=f'Chosen Threshold = {best_threshold:.2f}')
 plt.xlabel("Threshold")
 plt.ylabel("Score")
 plt.title("Precision and Recall vs Threshold")
