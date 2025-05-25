@@ -1,47 +1,68 @@
 import xgboost as xgb
 import matplotlib.pyplot as plt
 import networkx as nx
-from collections import defaultdict
+from collections import defaultdict, Counter
 
-def extract_feature_interactions(model):
+
+def extract_feature_interactions(model, feature_names=None):
     booster = model.get_booster()
     dump = booster.get_dump(with_stats=False)
+
+    interaction_counter = Counter()
     
-    interactions = set()
     for tree in dump:
         lines = tree.split('\n')
-        features_in_tree = set()
+        used_features = set()
         for line in lines:
             if '[' in line:
                 feature = line.split('[')[1].split('<')[0].strip()
-                features_in_tree.add(feature)
-        for f1 in features_in_tree:
-            for f2 in features_in_tree:
+                if feature_names and feature.startswith('f'):
+                    # Map "f0" -> actual feature name
+                    index = int(feature[1:])
+                    if index < len(feature_names):
+                        feature = feature_names[index]
+                used_features.add(feature)
+        for f1 in used_features:
+            for f2 in used_features:
                 if f1 != f2:
-                    interactions.add(tuple(sorted((f1, f2))))
-    return interactions
+                    key = tuple(sorted((f1, f2)))
+                    interaction_counter[key] += 1
+    return interaction_counter
 
-def plot_feature_interaction_graph(model, allowed_constraints=None):
-    interactions = extract_feature_interactions(model)
-    
+
+def plot_feature_interaction_graph(model, interaction_constraints=None, feature_names=None):
+    interactions = extract_feature_interactions(model, feature_names)
+
     G = nx.Graph()
-    G.add_edges_from(interactions)
-    
-    pos = nx.spring_layout(G)
-    colors = []
-    
-    for edge in G.edges():
-        if allowed_constraints is None:
-            colors.append("gray")
-        else:
+    for (f1, f2), weight in interactions.items():
+        G.add_edge(f1, f2, weight=weight)
+
+    pos = nx.spring_layout(G, seed=42)
+    edge_colors = []
+    edge_weights = []
+
+    for u, v, data in G.edges(data=True):
+        weight = data['weight']
+        edge_weights.append(weight / max(1, max(interactions.values())))  # normalize
+        if interaction_constraints:
             allowed = False
-            for constraint_group in allowed_constraints:
-                if edge[0] in constraint_group and edge[1] in constraint_group:
+            for group in interaction_constraints:
+                if u in group and v in group:
                     allowed = True
                     break
-            colors.append("green" if allowed else "red")
+            edge_colors.append("green" if allowed else "red")
+        else:
+            edge_colors.append("gray")
 
-    plt.figure(figsize=(12, 8))
-    nx.draw(G, pos, with_labels=True, edge_color=colors, node_color='lightblue', node_size=2000, font_size=12)
-    plt.title("Feature Interaction Graph (Green: Allowed, Red: Violated)")
+    plt.figure(figsize=(14, 10))
+    nx.draw(
+        G, pos,
+        with_labels=True,
+        edge_color=edge_colors,
+        width=[w * 3 for w in edge_weights],
+        node_color='lightblue',
+        node_size=2000,
+        font_size=12
+    )
+    plt.title("Feature Interaction Graph (Edge thickness = frequency)")
     plt.show()
