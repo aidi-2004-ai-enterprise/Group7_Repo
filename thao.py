@@ -130,7 +130,7 @@ def _plot_multiclass_curves(y_true, y_proba, classes, class_names=None):
     colors = plt.cm.Set1(np.linspace(0, 1, n_classes))
     
     # ROC Curves (One-vs-Rest)
-    for i, (class_label, color) in enumerate(zip(classes, colors)):
+    for i, (class_label, color) in enumerate(zip(classes, colors, strict=True)):
         y_true_binary = (y_true == class_label).astype(int)
         fpr, tpr, _ = roc_curve(y_true_binary, y_proba[:, i])
         roc_auc = roc_auc_score(y_true_binary, y_proba[:, i])
@@ -149,7 +149,7 @@ def _plot_multiclass_curves(y_true, y_proba, classes, class_names=None):
     ax1.grid(True, alpha=0.3)
     
     # Precision-Recall Curves
-    for i, (class_label, color) in enumerate(zip(classes, colors)):
+    for i, (class_label, color) in enumerate(zip(classes, colors, strict=True)):
         y_true_binary = (y_true == class_label).astype(int)
         precision, recall, _ = precision_recall_curve(y_true_binary, y_proba[:, i])
         avg_precision = average_precision_score(y_true_binary, y_proba[:, i])
