@@ -22,11 +22,11 @@ X_test_scaled = scaler.transform(X_test)
 
 # 4. XGBoost with GridSearchCV (simplified grid for speed)
 param_grid = {
-    'n_estimators': [120],  # Modified for thao branch
-    'max_depth': [4],       # Modified for thao branch
+    'n_estimators': [150],  # Combined value between 120 and 200
+    'max_depth': [4],       # Kept the same value from both branches
     'learning_rate': [0.1],
-    'subsample': [0.9],     # Modified for thao branch
-    'colsample_bytree': [0.9]  # Modified for thao branch
+    'subsample': [0.85],    # Middle ground between 0.9 and 0.8
+    'colsample_bytree': [0.85]  # Middle ground between 0.9 and 0.8
 }
 
 xgb = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
